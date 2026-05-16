@@ -1,0 +1,197 @@
+# Agent Cluster Orchestrator Deployment
+# Kubernetes Deployment Configuration
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-cluster-api
+  labels:
+    app: agent-cluster
+    component: api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agent-cluster
+      component: api
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: agent-cluster
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: api
+          image: agent-cluster/orchestrator:2.0.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agent-cluster-secrets
+                  key: database-url
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-cluster-secrets
+                  key: secret-key
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-cluster-secrets
+                  key: openai-api-key
+            - name: DEBUG
+              value: "false"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      restartPolicy: Always
+
+---
+
+# Celery Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-cluster-worker
+  labels:
+    app: agent-cluster
+    component: worker
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: agent-cluster
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: agent-cluster
+        component: worker
+    spec:
+      containers:
+        - name: worker
+          image: agent-cluster/orchestrator:2.0.0
+          imagePullPolicy: IfNotPresent
+          command: ["celery", "-A", "app.tasks.celery_config.celery", "worker", "--loglevel=info"]
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: agent-cluster-secrets
+                  key: database-url
+            - name: REDIS_URL
+              value: "redis://redis:6379/0"
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: agent-cluster-secrets
+                  key: openai-api-key
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+      restartPolicy: Always
+
+---
+
+# Service Configuration
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-cluster-service
+  labels:
+    app: agent-cluster
+spec:
+  type: ClusterIP
+  selector:
+    app: agent-cluster
+    component: api
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+
+---
+
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: agent-cluster-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: agent-cluster-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 80
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+
+---
+
+# Secrets Configuration
+apiVersion: v1
+kind: Secret
+metadata:
+  name: agent-cluster-secrets
+type: Opaque
+data:
+  database-url: cG9zdGdyZXNxbDthc3luY3BnOi8vcG9zdGdyZXM6cG9zdGdyZXNAcG9zdGdyZXM6NTQzMi9hZ2VudF9jbHVzdGVy
+  secret-key: eW91ci1zZWNyZXQta2V5LWhlcmUtY2hhbmdlLWluLXByb2R1Y3Rpb24tMjAyNA==
+  openai-api-key: c2stMTIzNDU2Nzg5MDEyMzQ1Njc4OTA=

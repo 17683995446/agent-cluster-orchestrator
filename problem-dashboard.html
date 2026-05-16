@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Cluster Orchestrator - 问题追踪仪表板</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #2d3748;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            color: #718096;
+            font-size: 1.1rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+        }
+
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #718096;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .success-rate {
+            color: #48bb78;
+        }
+
+        .error-count {
+            color: #f56565;
+        }
+
+        .warning-count {
+            color: #ed8936;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        .chart-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+
+        .problems-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .problems-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #2d3748;
+        }
+
+        .problem-card {
+            background: #f7fafc;
+            border-left: 4px solid;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .problem-card:hover {
+            transform: translateX(5px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        .problem-card.critical {
+            border-left-color: #e53e3e;
+        }
+
+        .problem-card.high {
+            border-left-color: #dd6b20;
+        }
+
+        .problem-card.medium {
+            border-left-color: #d69e2e;
+        }
+
+        .problem-card.low {
+            border-left-color: #38a169;
+        }
+
+        .problem-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .problem-title {
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .severity-badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .severity-badge.critical {
+            background: #fed7d7;
+            color: #c53030;
+        }
+
+        .severity-badge.high {
+            background: #feebc8;
+            color: #c05621;
+        }
+
+        .severity-badge.medium {
+            background: #fefcbf;
+            color: #975a16;
+        }
+
+        .severity-badge.low {
+            background: #c6f6d5;
+            color: #276749;
+        }
+
+        .problem-scenario {
+            color: #718096;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .problem-description {
+            color: #4a5568;
+            line-height: 1.6;
+            margin-bottom: 15px;
+        }
+
+        .solution-box {
+            background: #edf2f7;
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .solution-title {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #2d3748;
+        }
+
+        .solution-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            color: #4a5568;
+        }
+
+        .solution-item::before {
+            content: "✅";
+            margin-right: 10px;
+        }
+
+        .timeline {
+            margin-top: 30px;
+        }
+
+        .timeline-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 25px;
+            color: #2d3748;
+        }
+
+        .timeline-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+
+        .timeline-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 25px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .timeline-label {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        .timeline-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .timeline-list {
+            list-style: none;
+        }
+
+        .timeline-item {
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+        }
+
+        .timeline-item:last-child {
+            border-bottom: none;
+        }
+
+        .timeline-check {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #cbd5e0;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+        }
+
+        .timeline-check.completed {
+            background: #48bb78;
+            color: white;
+        }
+
+        .timeline-check.in-progress {
+            background: #4299e1;
+            color: white;
+        }
+
+        .timeline-check.pending {
+            background: #cbd5e0;
+            color: white;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid,
+            .timeline-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🎯 Agent Cluster Orchestrator</h1>
+            <p>问题追踪与解决进度仪表板 | 生成时间: 2026-05-16</p>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon">📊</div>
+                <div class="stat-value success-rate">95.69%</div>
+                <div class="stat-label">平均成功率</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">🔴</div>
+                <div class="stat-value error-count">5</div>
+                <div class="stat-label">发现问题总数</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">⚠️</div>
+                <div class="stat-value warning-count">2</div>
+                <div class="stat-label">高优先级问题</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon">✅</div>
+                <div class="stat-value">2/5</div>
+                <div class="stat-label">测试场景通过</div>
+            </div>
+        </div>
+
+        <!-- Charts -->
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">📈 测试场景成功率</div>
+                <canvas id="successRateChart"></canvas>
+            </div>
+            <div class="chart-card">
+                <div class="chart-title">🔍 问题严重程度分布</div>
+                <canvas id="severityChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Problems Section -->
+        <div class="problems-section">
+            <div class="problems-title">🔍 发现的问题</div>
+
+            <!-- Problem 1 -->
+            <div class="problem-card critical">
+                <div class="problem-header">
+                    <div class="problem-title">测试框架参数传递错误</div>
+                    <div class="severity-badge critical">CRITICAL</div>
+                </div>
+                <div class="problem-scenario">📍 场景: 长任务链, 混沌工程, 资源耗尽测试</div>
+                <div class="problem-description">
+                    TypeError: simulate_agent_task() got an unexpected keyword argument 'complexity'<br>
+                    3个复杂测试场景无法运行，无法验证系统的容错能力
+                </div>
+                <div class="solution-box">
+                    <div class="solution-title">💡 解决方案</div>
+                    <div class="solution-item">修复参数传递：使用关键字参数</div>
+                    <div class="solution-item">添加参数验证和类型检查</div>
+                    <div class="solution-item">工作量: 2小时</div>
+                </div>
+            </div>
+
+            <!-- Problem 2 -->
+            <div class="problem-card high">
+                <div class="problem-header">
+                    <div class="problem-title">高并发下的超时问题</div>
+                    <div class="severity-badge high">HIGH</div>
+                </div>
+                <div class="problem-scenario">📍 场景: 极限并发测试 (100 Agent)</div>
+                <div class="problem-description">
+                    检测到 2 个任务超时，4 个任务失败<br>
+                    可能原因：缺乏超时保护、资源竞争、任务调度不均衡
+                </div>
+                <div class="solution-box">
+                    <div class="solution-title">💡 解决方案</div>
+                    <div class="solution-item">实现任务超时保护机制</div>
+                    <div class="solution-item">添加超时配置和监控</div>
+                    <div class="solution-item">工作量: 4小时</div>
+                </div>
+            </div>
+
+            <!-- Problem 3 -->
+            <div class="problem-card high">
+                <div class="problem-header">
+                    <div class="problem-title">突发负载的错误率</div>
+                    <div class="severity-badge high">HIGH</div>
+                </div>
+                <div class="problem-scenario">📍 场景: 突发负载测试</div>
+                <div class="problem-description">
+                    流量突增时错误率上升至 ~5%<br>
+                    可能原因：缺乏流量控制、熔断器、自动扩容机制
+                </div>
+                <div class="solution-box">
+                    <div class="solution-title">💡 解决方案</div>
+                    <div class="solution-item">实现熔断器模式</div>
+                    <div class="solution-item">实现流量控制和背压机制</div>
+                    <div class="solution-item">工作量: 8小时</div>
+                </div>
+            </div>
+
+            <!-- Problem 4 -->
+            <div class="problem-card medium">
+                <div class="problem-header">
+                    <div class="problem-title">datetime API 警告</div>
+                    <div class="severity-badge medium">MEDIUM</div>
+                </div>
+                <div class="problem-scenario">📍 场景: 所有测试</div>
+                <div class="problem-description">
+                    datetime.datetime.utcnow() 已弃用<br>
+                    影响代码兼容性和最佳实践
+                </div>
+                <div class="solution-box">
+                    <div class="solution-title">💡 解决方案</div>
+                    <div class="solution-item">迁移到 datetime.now(timezone.utc)</div>
+                    <div class="solution-item">工作量: 1小时</div>
+                </div>
+            </div>
+
+            <!-- Problem 5 -->
+            <div class="problem-card medium">
+                <div class="problem-header">
+                    <div class="problem-title">缺乏真实压力测试</div>
+                    <div class="severity-badge medium">MEDIUM</div>
+                </div>
+                <div class="problem-scenario">📍 场景: 性能测试</div>
+                <div class="problem-description">
+                    当前测试过于简化，使用 sleep 模拟<br>
+                    无法发现真实的性能瓶颈和内存泄漏
+                </div>
+                <div class="solution-box">
+                    <div class="solution-title">💡 解决方案</div>
+                    <div class="solution-item">集成真实 LLM 推理</div>
+                    <div class="solution-item">添加真实 I/O 测试</div>
+                    <div class="solution-item">工作量: 20小时</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline">
+            <div class="timeline-title">📅 优化计划时间线</div>
+            <div class="timeline-grid">
+                <!-- Immediate -->
+                <div class="timeline-card">
+                    <div class="timeline-header">
+                        <div class="timeline-label">🚀 立即行动</div>
+                        <div class="timeline-badge">今天</div>
+                    </div>
+                    <ul class="timeline-list">
+                        <li class="timeline-item">
+                            <div class="timeline-check completed">✓</div>
+                            创建测试框架
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check in-progress">●</div>
+                            修复参数错误
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            修复 datetime 警告
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Short Term -->
+                <div class="timeline-card">
+                    <div class="timeline-header">
+                        <div class="timeline-label">⚡ 短期 (1周)</div>
+                        <div class="timeline-badge">7天</div>
+                    </div>
+                    <ul class="timeline-list">
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            超时保护机制
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            熔断器模式
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            单元测试覆盖
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Medium Term -->
+                <div class="timeline-card">
+                    <div class="timeline-header">
+                        <div class="timeline-label">🎯 中期 (1月)</div>
+                        <div class="timeline-badge">30天</div>
+                    </div>
+                    <ul class="timeline-list">
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            流量控制
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            资源监控
+                        </li>
+                        <li class="timeline-item">
+                            <div class="timeline-check pending">○</div>
+                            真实压力测试
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            <p>Agent Cluster Orchestrator © 2026 | 问题追踪与持续优化</p>
+        </div>
+    </div>
+
+    <script>
+        // Success Rate Chart
+        const ctx1 = document.getElementById('successRateChart').getContext('2d');
+        new Chart(ctx1, {
+            type: 'bar',
+            data: {
+                labels: ['极限并发', '突发负载', '长任务链', '混沌工程', '资源耗尽'],
+                datasets: [{
+                    label: '成功率 (%)',
+                    data: [96.0, 95.38, 0, 0, 0],
+                    backgroundColor: [
+                        'rgba(72, 187, 120, 0.8)',
+                        'rgba(72, 187, 120, 0.8)',
+                        'rgba(245, 101, 101, 0.8)',
+                        'rgba(245, 101, 101, 0.8)',
+                        'rgba(245, 101, 101, 0.8)'
+                    ],
+                    borderRadius: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        ticks: {
+                            callback: function(value) {
+                                return value + '%';
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Severity Chart
+        const ctx2 = document.getElementById('severityChart').getContext('2d');
+        new Chart(ctx2, {
+            type: 'doughnut',
+            data: {
+                labels: ['Critical', 'High', 'Medium', 'Low'],
+                datasets: [{
+                    data: [1, 2, 2, 0],
+                    backgroundColor: [
+                        'rgba(229, 62, 62, 0.8)',
+                        'rgba(221, 107, 32, 0.8)',
+                        'rgba(214, 158, 46, 0.8)',
+                        'rgba(56, 161, 105, 0.8)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    </script>
+</body>
+</html>

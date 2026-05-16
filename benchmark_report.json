@@ -1,0 +1,61 @@
+{
+  "timestamp": "2026-05-16T05:12:32.535548",
+  "config": {
+    "iterations": 100,
+    "concurrent_users": 20
+  },
+  "benchmarks": [
+    {
+      "type": "cache_performance",
+      "iterations": 100,
+      "avg_time_ms": 0.0026047229766845703,
+      "p95_time_ms": 0.0050067901611328125,
+      "success_rate": 2.0,
+      "errors": 0,
+      "metrics": {
+        "write_avg_ms": 0.0035691261291503906,
+        "read_avg_ms": 0.00164031982421875,
+        "cache_hits": 100,
+        "cache_misses": 0
+      }
+    },
+    {
+      "type": "agent_creation",
+      "iterations": 100,
+      "avg_time_ms": 0.007414817810058594,
+      "p95_time_ms": 0.011920928955078125,
+      "success_rate": 1.0,
+      "errors": 0,
+      "metrics": {}
+    },
+    {
+      "type": "task_execution",
+      "iterations": 100,
+      "avg_time_ms": 0.007071495056152344,
+      "p95_time_ms": 0.0095367431640625,
+      "success_rate": 1.0,
+      "errors": 0,
+      "metrics": {}
+    },
+    {
+      "type": "retry_mechanism",
+      "iterations": 100,
+      "avg_time_ms": 2990.159113407135,
+      "p95_time_ms": 3225.31795501709,
+      "success_rate": 1.0,
+      "errors": 0,
+      "metrics": {}
+    },
+    {
+      "type": "task_execution",
+      "iterations": 100,
+      "avg_time_ms": 0.009131431579589844,
+      "p95_time_ms": 0.04553794860839844,
+      "success_rate": 0.2,
+      "errors": 0,
+      "metrics": {
+        "concurrent_users": 20
+      }
+    }
+  ]
+}

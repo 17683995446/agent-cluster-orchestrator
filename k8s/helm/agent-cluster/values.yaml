@@ -1,0 +1,124 @@
+# Helm Chart Values for Agent Cluster Orchestrator
+
+# Global configuration
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  nameOverride: ""
+  fullnameOverride: ""
+
+# Application configuration
+app:
+  name: agent-cluster-orchestrator
+  replicaCount: 3
+  image:
+    repository: agent-cluster/orchestrator
+    pullPolicy: IfNotPresent
+    tag: "2.0.0"
+  
+  # Environment variables
+  env:
+    DEBUG: "false"
+    DATABASE_URL: "postgresql+asyncpg://postgres:postgres@postgres:5432/agent_cluster"
+    REDIS_URL: "redis://redis:6379/0"
+    SECRET_KEY: "your-secret-key-here-change-in-production"
+    OPENAI_API_KEY: ""
+    ANTHROPIC_API_KEY: ""
+  
+  # Resources
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+  
+  # Autoscaling
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+
+# Celery Workers
+celery:
+  enabled: true
+  replicaCount: 5
+  image:
+    repository: agent-cluster/orchestrator
+    pullPolicy: IfNotPresent
+    tag: "2.0.0"
+  
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+# Database configuration
+postgresql:
+  enabled: true
+  postgresqlDatabase: agent_cluster
+  postgresqlUsername: postgres
+  postgresqlPassword: postgres
+  persistence:
+    enabled: true
+    size: 10Gi
+
+# Redis configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  persistence:
+    enabled: true
+    size: 5Gi
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+  hosts:
+    - host: agent-cluster.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: agent-cluster-tls
+      hosts:
+        - agent-cluster.example.com
+
+# Monitoring configuration
+monitoring:
+  enabled: true
+  prometheus:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+  grafana:
+    enabled: true
+    dashboards:
+      enabled: true
+
+# Logging configuration
+logging:
+  level: INFO
+  format: json
+  retention: 7
+  maxSize: 100Mi
+
+# Security configuration
+security:
+  allowlist:
+    enabled: false
+    ips: []
+  rateLimit:
+    enabled: true
+    requestsPerSecond: 100

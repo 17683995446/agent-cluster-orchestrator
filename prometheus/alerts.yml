@@ -1,0 +1,208 @@
+# Alert Rules for Agent Cluster Orchestrator System
+groups:
+  - name: agent-cluster.rules
+    interval: 30s
+    rules:
+      # ========== Availability Alerts ==========
+      - alert: APIUnavailable
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "API service is unavailable"
+          description: "API service {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/api-unavailable"
+      
+      - alert: DatabaseUnavailable
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "PostgreSQL database is unavailable"
+          description: "PostgreSQL database {{ $labels.instance }} is down"
+          runbook_url: "https://docs.example.com/runbooks/db-unavailable"
+      
+      - alert: RedisUnavailable
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Redis is unavailable"
+          description: "Redis instance {{ $labels.instance }} is down"
+          runbook_url: "https://docs.example.com/runbooks/redis-unavailable"
+
+      # ========== Performance Alerts ==========
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) 
+            / sum(rate(http_requests_total[5m]))
+          ) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for more than 5 minutes"
+          runbook_url: "https://docs.example.com/runbooks/high-error-rate"
+      
+      - alert: HighLatency
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, endpoint)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency detected"
+          description: "95th percentile latency is {{ $value }}s for endpoint {{ $labels.endpoint }}"
+          runbook_url: "https://docs.example.com/runbooks/high-latency"
+      
+      - alert: TaskExecutionDelay
+        expr: |
+          sum(rate(task_queue_length[5m])) 
+          / sum(rate(task_processing_rate[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Task queue is backing up"
+          description: "Task queue depth is {{ $value }}x processing rate"
+          runbook_url: "https://docs.example.com/runbooks/queue-backup"
+
+      # ========== Capacity Alerts ==========
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) 
+            / node_memory_MemTotal_bytes
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High memory usage"
+          description: "Node {{ $labels.instance }} memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-memory"
+      
+      - alert: HighCPUUsage
+        expr: |
+          (100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "High CPU usage"
+          description: "Node {{ $labels.instance }} CPU usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/high-cpu"
+      
+      - alert: LowDiskSpace
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!="tmpfs"} 
+            / node_filesystem_size_bytes{fstype!="tmpfs"}
+          ) < 0.15
+        for: 5m
+        labels:
+          severity: warning
+          team: devops
+        annotations:
+          summary: "Low disk space"
+          description: "Node {{ $labels.instance }} has {{ $value | humanizePercentage }} free space"
+          runbook_url: "https://docs.example.com/runbooks/low-disk-space"
+      
+      - alert: DiskSpaceCritical
+        expr: |
+          (
+            node_filesystem_avail_bytes{fstype!="tmpfs"} 
+            / node_filesystem_size_bytes{fstype!="tmpfs"}
+          ) < 0.05
+        for: 1m
+        labels:
+          severity: critical
+          team: devops
+        annotations:
+          summary: "Disk space critically low"
+          description: "Node {{ $labels.instance }} has only {{ $value | humanizePercentage }} free space"
+          runbook_url: "https://docs.example.com/runbooks/disk-space-critical"
+
+      # ========== Security Alerts ==========
+      - alert: RateLimitExceeded
+        expr: |
+          sum(rate(rate_limit_exceeded_total[1m])) > 100
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Rate limit exceeded frequently"
+          description: "Rate limit exceeded {{ $value }} times in 1 minute"
+          runbook_url: "https://docs.example.com/runbooks/rate-limit"
+      
+      - alert: AuthenticationFailures
+        expr: |
+          sum(rate(authentication_failure_total[5m])) > 50
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "{{ $value }} authentication failures detected"
+          runbook_url: "https://docs.example.com/runbooks/auth-failures"
+
+      # ========== Business Metrics Alerts ==========
+      - alert: TaskFailureRateHigh
+        expr: |
+          (
+            sum(rate(task_failed_total[5m])) 
+            / sum(rate(task_completed_total[5m]))
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "High task failure rate"
+          description: "Task failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.example.com/runbooks/task-failures"
+      
+      - alert: AgentIdleRate
+        expr: |
+          (
+            sum(agent_status{status="idle"}) 
+            / sum(agent_status)
+          ) > 0.5
+        for: 15m
+        labels:
+          severity: info
+          team: product
+        annotations:
+          summary: "Many agents are idle"
+          description: "{{ $value | humanizePercentage }} of agents are idle"
+
+      # ========== Recording Rules ==========
+      - record: job:http_requests_total:rate1m
+        expr: sum(rate(http_requests_total[1m])) by (job)
+      
+      - record: job:task_queue_length:avg5m
+        expr: avg_over_time(task_queue_length[5m])
+      
+      - record: job:agent_utilization:avg10m
+        expr: |
+          100 - (
+            sum(agent_status{status="idle"}) 
+            / sum(agent_status)
+          ) * 100

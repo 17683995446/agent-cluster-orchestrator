@@ -1,0 +1,135 @@
+apiVersion: v2
+name: agent-cluster
+description: A Helm chart for Agent Cluster Orchestrator
+type: application
+version: 1.0.0
+appVersion: "2.0.0"
+
+keywords:
+  - agent
+  - orchestration
+  - llm
+  - cluster
+
+maintainers:
+  - name: Agent Cluster Team
+
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: redis.enabled
+
+values:
+  postgresql:
+    enabled: true
+    auth:
+      username: postgres
+      password: postgres
+      database: agent_cluster
+    primary:
+      persistence:
+        enabled: true
+        size: 10Gi
+
+  redis:
+    enabled: true
+    auth:
+      enabled: false
+    master:
+      persistence:
+        enabled: true
+        size: 5Gi
+
+  backend:
+    replicaCount: 3
+    image:
+      repository: agent-cluster-backend
+      tag: latest
+      pullPolicy: IfNotPresent
+    service:
+      type: ClusterIP
+      port: 8000
+    env:
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 250m
+        memory: 256Mi
+    livenessProbe:
+      path: /api/v1/health
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      path: /api/v1/ready
+      initialDelaySeconds: 5
+      periodSeconds: 5
+
+  celery:
+    replicaCount: 2
+    image:
+      repository: agent-cluster-backend
+      tag: latest
+    concurrency: 4
+    queues:
+      - llm_tasks
+      - cluster_tasks
+      - default
+
+  frontend:
+    replicaCount: 2
+    image:
+      repository: agent-cluster-frontend
+      tag: latest
+    service:
+      type: ClusterIP
+      port: 3000
+    resources:
+      limits:
+        cpu: 100m
+        memory: 128Mi
+      requests:
+        cpu: 50m
+        memory: 64Mi
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    hosts:
+      - host: agent-cluster.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: agent-cluster-tls
+        hosts:
+          - agent-cluster.example.com
+
+  prometheus:
+    enabled: true
+    server:
+      retention: 15d
+    alertmanager:
+      enabled: false
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+secrets:
+  OPENAI_API_KEY: ""
+  ANTHROPIC_API_KEY: ""
+  SECRET_KEY: ""

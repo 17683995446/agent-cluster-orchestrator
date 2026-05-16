@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent 集群编排系统 - 架构文档</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .tab-active {
+            border-bottom: 3px solid #3b82f6;
+            color: #3b82f6;
+        }
+        .diagram-container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+        .diagram-container:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .mermaid {
+            padding: 2rem;
+            overflow-x: auto;
+        }
+        .nav-item {
+            transition: all 0.2s;
+        }
+        .nav-item:hover {
+            background-color: #f3f4f6;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 to-purple-700 text-white shadow-lg">
+            <div class="max-w-7xl mx-auto px-4 py-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h1 class="text-3xl font-bold">Agent 集群编排系统</h1>
+                        <p class="text-blue-100 mt-2">架构文档 - 版本 2.0</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="text-sm bg-blue-500 bg-opacity-30 px-3 py-1 rounded-full" id="lastUpdate">最后更新: --</span>
+                        <button onclick="window.location.reload()" class="bg-white text-blue-600 px-4 py-2 rounded-lg hover:bg-blue-50 transition">
+                            ↻ 刷新
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <div class="flex max-w-7xl mx-auto">
+            <!-- Sidebar Navigation -->
+            <nav class="w-64 bg-white shadow-lg p-4 sticky top-0 h-screen overflow-y-auto">
+                <h3 class="font-semibold text-gray-700 mb-4 text-sm uppercase tracking-wider">目录</h3>
+                <ul class="space-y-2">
+                    <li><a href="#overview" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">📋 系统概览</a></li>
+                    <li><a href="#architecture" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">🏗️ 系统架构</a></li>
+                    <li><a href="#components" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">🧩 核心组件</a></li>
+                    <li><a href="#flow" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">🔄 任务流程</a></li>
+                    <li><a href="#sequence" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">📊 时序图</a></li>
+                    <li><a href="#api" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">🔌 API 端点</a></li>
+                    <li><a href="#deployment" class="nav-item block px-3 py-2 rounded-lg text-gray-600 hover:text-blue-600">🚀 部署架构</a></li>
+                </ul>
+            </nav>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-8">
+                <!-- Overview Section -->
+                <section id="overview" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">📋</span> 系统概览
+                    </h2>
+                    <div class="grid md:grid-cols-3 gap-6 mb-8">
+                        <div class="diagram-container p-6">
+                            <h3 class="font-semibold text-lg mb-2 text-blue-600">⚡ 性能</h3>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• 异步处理架构</li>
+                                <li>• 分布式任务调度</li>
+                                <li>• 多级缓存策略</li>
+                            </ul>
+                        </div>
+                        <div class="diagram-container p-6">
+                            <h3 class="font-semibold text-lg mb-2 text-green-600">🛡️ 安全</h3>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• JWT 认证</li>
+                                <li>• API Key 支持</li>
+                                <li>• 速率限制保护</li>
+                            </ul>
+                        </div>
+                        <div class="diagram-container p-6">
+                            <h3 class="font-semibold text-lg mb-2 text-purple-600">📊 可观测性</h3>
+                            <ul class="text-sm text-gray-600 space-y-1">
+                                <li>• Prometheus 指标</li>
+                                <li>• OpenTelemetry 追踪</li>
+                                <li>• 结构化日志</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="diagram-container">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">系统组成</h3>
+                        <div class="mermaid">
+graph TB
+    subgraph "用户层"
+        Client["客户端<br/>(Web/API)"]
+        Admin["管理后台"]
+    end
+    
+    subgraph "网关层"
+        API["FastAPI 网关"]
+        WS["WebSocket<br/>实时通信"]
+    end
+    
+    subgraph "服务层"
+        Auth["认证服务<br/>(JWT/API Key)"]
+        AgentService["Agent 管理服务"]
+        TaskService["任务调度服务"]
+        Cluster["集群编排服务"]
+    end
+    
+    subgraph "执行层"
+        LLM["LLM 提供者<br/>(OpenAI/Anthropic)"]
+        Celery["Celery 任务队列"]
+        Workers["Worker 池"]
+    end
+    
+    subgraph "数据层"
+        DB[(PostgreSQL)]
+        Cache[(Redis)]
+    end
+    
+    Client --> API
+    Admin --> API
+    API --> Auth
+    API --> AgentService
+    API --> TaskService
+    API --> Cluster
+    API --> WS
+    
+    AgentService --> DB
+    AgentService --> Cache
+    TaskService --> DB
+    TaskService --> Cache
+    Cluster --> DB
+    
+    TaskService --> Celery
+    Celery --> Workers
+    Workers --> LLM
+    
+    WS --> Client
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Architecture Section -->
+                <section id="architecture" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">🏗️</span> 系统架构
+                    </h2>
+                    
+                    <div class="diagram-container mb-6">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">整体架构设计</h3>
+                        <div class="mermaid">
+graph TB
+    classDef layer fill:#e0f2fe,stroke:#0284c7,stroke-width:2px;
+    classDef service fill:#f0fdf4,stroke:#16a34a,stroke-width:2px;
+    classDef db fill:#fef3c7,stroke:#d97706,stroke-width:2px;
+    
+    subgraph PresentationLayer["展示层"]
+        FE[前端应用<br/>React + TypeScript]
+        REST[RESTful API]
+        WSAPI[WebSocket API]
+    end
+    
+    subgraph BusinessLayer["业务逻辑层"]
+        AgentMgmt[Agent生命周期管理]
+        TaskDispatch[任务分发与执行]
+        ClusterOrch[集群编排]
+        AuthService[认证与授权]
+    end
+    
+    subgraph ServiceLayer["服务层"]
+        CacheManager[缓存管理]
+        LLMProvider[LLM提供者]
+        Metrics[指标收集]
+        Tracing[分布式追踪]
+    end
+    
+    subgraph DataLayer["数据层"]
+        PG[(PostgreSQL)]
+        Redis[(Redis)]
+    end
+    
+    FE --> REST
+    FE --> WSAPI
+    REST --> AgentMgmt
+    REST --> TaskDispatch
+    REST --> ClusterOrch
+    REST --> AuthService
+    WSAPI --> ClusterOrch
+    
+    AgentMgmt --> CacheManager
+    AgentMgmt --> LLMProvider
+    AgentMgmt --> Metrics
+    AgentMgmt --> Tracing
+    
+    TaskDispatch --> CacheManager
+    TaskDispatch --> LLMProvider
+    TaskDispatch --> Metrics
+    
+    ClusterOrch --> LLMProvider
+    ClusterOrch --> Metrics
+    
+    AuthService --> Metrics
+    
+    AgentMgmt --> PG
+    TaskDispatch --> PG
+    AuthService --> PG
+    
+    CacheManager --> Redis
+    
+    class PresentationLayer layer;
+    class BusinessLayer service;
+    class DataLayer db;
+                        </div>
+                    </div>
+
+                    <div class="diagram-container">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">目录结构</h3>
+                        <div class="p-6">
+                            <pre class="bg-gray-900 text-green-400 p-4 rounded-lg overflow-x-auto text-sm">
+backend/
+├── app/
+│   ├── api/                     # API 端点
+│   │   ├── v1/                 # v1 版本 API
+│   │   │   ├── agent_management_endpoints.py
+│   │   │   ├── task_execution_endpoints.py
+│   │   │   ├── cluster_orchestration_endpoints.py
+│   │   │   ├── authentication_endpoints.py
+│   │   │   └── websocket_endpoints.py
+│   │   ├── health_check_endpoints.py
+│   │   └── api_documentation.py
+│   ├── services/               # 业务逻辑
+│   │   ├── agent_lifecycle_management_service.py
+│   │   └── task_dispatch_and_execution_service.py
+│   ├── models/                 # 数据模型
+│   │   ├── agent_data_model.py
+│   │   ├── task_data_model.py
+│   │   └── user_data_model.py
+│   ├── repositories/           # 数据访问层
+│   │   ├── agent_persistence_repository.py
+│   │   └── task_persistence_repository.py
+│   ├── schemas/                # Pydantic 模型
+│   │   ├── agent_api_schemas.py
+│   │   ├── task_api_schemas.py
+│   │   └── authentication_schemas.py
+│   ├── security/               # 安全模块
+│   │   ├── jwt_authentication.py
+│   │   ├── api_key_authentication.py
+│   │   └── rate_limiter.py
+│   ├── cache/                  # 缓存模块
+│   │   ├── redis_cache_manager.py
+│   │   └── advanced_cache_strategy_manager.py
+│   ├── observability/          # 可观测性
+│   │   └── opentelemetry_tracing.py
+│   ├── websocket/              # WebSocket
+│   │   └── websocket_connection_manager.py
+│   ├── core/                   # 核心功能
+│   │   ├── structured_logging_config.py
+│   │   └── enhanced_exception_handler.py
+│   ├── llm/                    # LLM 集成
+│   │   ├── base_llm_provider_interface.py
+│   │   ├── llm_provider_manager.py
+│   │   ├── openai_llm_provider.py
+│   │   └── anthropic_llm_provider.py
+│   ├── database_connection_manager.py
+│   ├── application_configuration.py
+│   └── main_fastapi_application.py
+├── tests/                      # 测试
+│   ├── unit/
+│   └── integration/
+└── requirements.txt
+
+frontend/
+├── src/
+│   ├── components/
+│   ├── hooks/
+│   ├── services/
+│   └── main_application_entry.tsx
+└── package.json
+                            </pre>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Components Section -->
+                <section id="components" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">🧩</span> 核心组件
+                    </h2>
+
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-blue-700">🔐 认证系统</h3>
+                            <div class="mermaid">
+graph LR
+    User[用户] --> Login[登录端点<br/>/api/v1/auth/login]
+    Login --> Validate[验证凭据]
+    Validate -->|成功| JWT[JWT管理器]
+    JWT -->|生成| AccessToken[访问令牌<br/>30分钟]
+    JWT -->|生成| RefreshToken[刷新令牌<br/>7天]
+    Validate -->|失败| Error[返回错误]
+    
+    Request[API请求] --> CheckAuth[检查认证]
+    CheckAuth -->|验证令牌| Verify[验证JWT]
+    Verify -->|有效| Process[处理请求]
+    Verify -->|过期/无效| Reject[拒绝请求]
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-green-700">🗂️ 缓存策略</h3>
+                            <div class="mermaid">
+graph TB
+    Request[请求数据] --> L1[本地内存缓存<br/>LRU策略]
+    L1 -->|命中| Return[返回数据]
+    L1 -->|未命中| L2[Redis缓存<br/>分布式]
+    L2 -->|命中| L1Update[更新L1缓存]
+    L1Update --> Return
+    L2 -->|未命中| DB[(数据库)]
+    DB -->|查询| L2Update[更新L2缓存]
+    L2Update --> L1Update
+    
+    subgraph "缓存策略"
+        CacheAside[Cache-Aside<br/>懒加载]
+        WriteThrough[Write-Through<br/>写穿透]
+        RefreshAhead[Refresh-Ahead<br/>提前刷新]
+    end
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-purple-700">📡 WebSocket 连接管理</h3>
+                            <div class="mermaid">
+stateDiagram-v2
+    [*] --> Connecting
+    Connecting --> Connected: 握手成功
+    Connected --> Authenticating: 验证身份
+    Authenticating --> Subscribed: 订阅频道
+    Authenticating --> Disconnected: 验证失败
+    
+    Subscribed --> Active: 接收消息
+    Active --> Subscribed: 继续
+    Active --> Disconnected: 连接关闭
+    
+    Connected --> Heartbeat: 心跳检测
+    Heartbeat --> Connected: 心跳响应
+    Heartbeat --> Disconnected: 超时
+    
+    Disconnected --> Reconnecting: 自动重连
+    Reconnecting --> Connecting
+    Disconnected --> [*]
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-orange-700">🤖 Agent 生命周期</h3>
+                            <div class="mermaid">
+stateDiagram-v2
+    [*] --> Creating: 创建Agent
+    Creating --> Registering: 注册
+    Registering --> Idle: 就绪
+    Idle --> Assigned: 分配任务
+    Assigned --> Processing: 处理中
+    Processing --> Completed: 完成
+    Completed --> Idle: 等待下一个
+    Processing --> Error: 错误
+    Error --> Idle: 重试或重置
+    Idle --> Disabled: 禁用
+    Disabled --> Idle: 启用
+    Disabled --> [*]
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Flow Section -->
+                <section id="flow" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">🔄</span> 任务流程
+                    </h2>
+
+                    <div class="diagram-container mb-6">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">任务执行流程</h3>
+                        <div class="mermaid">
+flowchart TD
+    Start([用户提交任务]) --> Validate{验证任务}
+    Validate -->|无效| Err[返回错误]
+    Validate -->|有效| CreateTask[创建任务记录<br/>状态: PENDING]
+    CreateTask --> Cache[更新缓存]
+    Cache --> Notify[WebSocket通知<br/>任务创建]
+    Notify --> Queue[加入Celery队列]
+    Queue --> Worker[Worker拾取任务]
+    Worker --> Assign[分配给合适Agent]
+    Assign --> UpdateStatus[更新状态: PROCESSING]
+    UpdateStatus --> Exec[执行LLM调用]
+    Exec -->|成功| Complete[任务完成<br/>状态: COMPLETED]
+    Exec -->|失败| Fail[任务失败<br/>状态: FAILED]
+    Complete --> Store[存储结果]
+    Fail --> Store
+    Store --> Notify2[WebSocket通知<br/>状态变更]
+    Notify2 --> Done([用户获取结果])
+                        </div>
+                    </div>
+
+                    <div class="diagram-container">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">集群任务执行流程</h3>
+                        <div class="mermaid">
+flowchart TD
+    Start([提交集群任务]) --> Decompose[任务分解<br/>拆分为子任务]
+    Decompose --> Dependency[分析依赖关系]
+    Dependency --> Schedule[调度子任务]
+    Schedule --> Parallel[并行执行<br/>无依赖子任务]
+    Schedule --> Sequential[串行执行<br/>有依赖子任务]
+    
+    Parallel --> Collect1[收集中间结果]
+    Sequential --> Collect1
+    
+    Collect1 --> Aggregate[结果聚合]
+    Aggregate --> Final[生成最终结果]
+    Final --> Notify[通知用户]
+    
+    subgraph "子任务处理"
+        ST1[子任务1]
+        ST2[子任务2]
+        ST3[子任务3]
+    end
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sequence Section -->
+                <section id="sequence" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">📊</span> 时序图
+                    </h2>
+
+                    <div class="diagram-container mb-6">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">完整任务执行时序</h3>
+                        <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Client as 客户端
+    participant API as FastAPI
+    participant Auth as 认证服务
+    participant DB as PostgreSQL
+    participant Redis as Redis
+    participant Celery as Celery
+    participant Worker as Worker
+    participant LLM as LLM
+    participant WS as WebSocket
+    
+    Client->>API: POST /api/v1/tasks
+    API->>Auth: 验证JWT Token
+    Auth-->>API: ✅ 验证通过
+    API->>DB: 插入任务记录 (PENDING)
+    DB-->>API: 返回 Task ID
+    API->>Redis: 缓存任务信息
+    API->>WS: 广播任务创建事件
+    WS-->>Client: 📢 任务已创建
+    
+    API->>Celery: 提交异步任务
+    Celery->>Worker: 分派任务
+    Worker->>Redis: 查询Agent信息
+    Redis-->>Worker: 返回Agent
+    Worker->>DB: 更新任务状态 (PROCESSING)
+    Worker->>WS: 广播状态变更
+    WS-->>Client: 📢 任务处理中
+    
+    Worker->>LLM: 调用LLM API
+    LLM-->>Worker: 返回结果
+    Worker->>DB: 存储结果 (COMPLETED)
+    Worker->>Redis: 更新缓存
+    Worker->>WS: 广播完成事件
+    WS-->>Client: 📢 任务完成！
+    
+    Client->>API: GET /api/v1/tasks/{id}
+    API->>Redis: 尝试从缓存获取
+    Redis-->>API: 返回缓存结果
+    API-->>Client: 返回完整结果
+                        </div>
+                    </div>
+
+                    <div class="diagram-container">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">WebSocket 实时通信</h3>
+                        <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant Client as 客户端
+    participant WS as WebSocket Server
+    participant Manager as 连接管理器
+    participant PubSub as Redis PubSub
+    
+    Client->>WS: 发起连接 /api/v1/ws
+    WS->>Manager: 注册新连接
+    Manager-->>WS: 分配 Client ID
+    WS-->>Client: 🔌 连接建立
+    
+    Client->>WS: 发送认证 Token
+    WS->>Manager: 验证身份
+    Manager-->>WS: ✅ 认证成功
+    WS-->>Client: 🎟️ 已认证
+    
+    Client->>WS: 订阅频道: tasks, agents
+    WS->>Manager: 添加订阅
+    Manager->>PubSub: 订阅频道
+    PubSub-->>Manager: 确认订阅
+    
+    Note over Manager: 有事件发生...
+    Manager->>PubSub: 发布事件
+    PubSub->>Manager: 转发给订阅者
+    Manager->>WS: 发送到匹配客户端
+    WS-->>Client: 📨 推送消息
+    
+    Client->>WS: 发送心跳
+    WS-->>Client: ❤️ Pong
+    
+    Client->>WS: 断开连接
+    WS->>Manager: 清理连接
+    Manager->>PubSub: 取消订阅
+                        </div>
+                    </div>
+                </section>
+
+                <!-- API Section -->
+                <section id="api" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">🔌</span> API 端点
+                    </h2>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-blue-700">Agent API</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/api/v1/agents</code> - 获取Agent列表</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/api/v1/agents/{id}</code> - 获取Agent详情</div>
+                                <div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono text-xs">POST</span> <code>/api/v1/agents</code> - 创建Agent</div>
+                                <div class="flex items-center gap-2"><span class="bg-yellow-100 text-yellow-700 px-2 py-1 rounded font-mono text-xs">PUT</span> <code>/api/v1/agents/{id}</code> - 更新Agent</div>
+                                <div class="flex items-center gap-2"><span class="bg-red-100 text-red-700 px-2 py-1 rounded font-mono text-xs">DELETE</span> <code>/api/v1/agents/{id}</code> - 删除Agent</div>
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-green-700">Task API</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/api/v1/tasks</code> - 获取任务列表</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/api/v1/tasks/{id}</code> - 获取任务详情</div>
+                                <div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono text-xs">POST</span> <code>/api/v1/tasks</code> - 创建任务</div>
+                                <div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono text-xs">POST</span> <code>/api/v1/cluster/execute</code> - 执行集群任务</div>
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-purple-700">Auth API</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono text-xs">POST</span> <code>/api/v1/auth/login</code> - 用户登录</div>
+                                <div class="flex items-center gap-2"><span class="bg-blue-100 text-blue-700 px-2 py-1 rounded font-mono text-xs">POST</span> <code>/api/v1/auth/refresh</code> - 刷新令牌</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/api/v1/auth/me</code> - 获取用户信息</div>
+                            </div>
+                        </div>
+
+                        <div class="diagram-container p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-orange-700">健康检查 & 监控</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/health</code> - 基本健康检查</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/liveness</code> - Kubernetes存活探针</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/readiness</code> - Kubernetes就绪探针</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/metrics</code> - Prometheus指标</div>
+                                <div class="flex items-center gap-2"><span class="bg-green-100 text-green-700 px-2 py-1 rounded font-mono text-xs">GET</span> <code>/info</code> - 服务信息</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Deployment Section -->
+                <section id="deployment" class="mb-12">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <span class="text-3xl">🚀</span> 部署架构
+                    </h2>
+
+                    <div class="diagram-container mb-6">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">Kubernetes 部署架构</h3>
+                        <div class="mermaid">
+graph TB
+    subgraph "Kubernetes Cluster"
+        Ingress[Ingress<br/>负载均衡]
+        
+        subgraph "Services"
+            API[API Service<br/>Deployment]
+            CeleryBeat[Celery Beat<br/>CronJob]
+            Prometheus[Prometheus<br/>ServiceMonitor]
+        end
+        
+        subgraph "Workers"
+            Worker1[Worker Pod 1]
+            Worker2[Worker Pod 2]
+            Worker3[Worker Pod 3]
+            WorkerN[Worker Pod N...]
+        end
+        
+        subgraph "Stateful"
+            PG[PostgreSQL<br/>StatefulSet]
+            Redis[Redis<br/>StatefulSet]
+        end
+        
+        HPA[Horizontal Pod Autoscaler]
+        HPA --> API
+        HPA -->|基于队列长度| Workers
+    end
+    
+    External[外部流量] --> Ingress
+    Ingress --> API
+    API --> PG
+    API --> Redis
+    API --> CeleryBeat
+    CeleryBeat --> Redis
+    Workers --> Redis
+    Workers --> PG
+    Prometheus --> API
+    Prometheus --> Workers
+                        </div>
+                    </div>
+
+                    <div class="diagram-container">
+                        <h3 class="text-xl font-semibold p-6 pb-0 text-gray-800">Docker Compose (开发环境)</h3>
+                        <div class="mermaid">
+graph LR
+    classDef container fill:#dbeafe,stroke:#3b82f6,stroke-width:2px;
+    
+    Browser[浏览器] --> Frontend
+    
+    subgraph "Docker Compose"
+        Frontend[Frontend<br/>React Dev Server]
+        API[Backend API<br/>FastAPI]
+        Celery[Celery Worker]
+        Redis[Redis]
+        PG[(PostgreSQL)]
+    end
+    
+    Frontend --> API
+    API --> PG
+    API --> Redis
+    Celery --> Redis
+    Celery --> PG
+    
+    class Frontend,API,Celery,Redis,PG container;
+                        </div>
+                    </div>
+
+                    <div class="mt-6 diagram-container p-6">
+                        <h3 class="text-lg font-semibold mb-4">📦 技术栈</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div class="bg-blue-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">🐍</div>
+                                <div class="font-semibold">Python 3.11+</div>
+                                <div class="text-sm text-gray-600">FastAPI 0.115</div>
+                            </div>
+                            <div class="bg-green-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">🗄️</div>
+                                <div class="font-semibold">PostgreSQL</div>
+                                <div class="text-sm text-gray-600">SQLAlchemy 2.0</div>
+                            </div>
+                            <div class="bg-red-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">⚡</div>
+                                <div class="font-semibold">Redis</div>
+                                <div class="text-sm text-gray-600">缓存 & 队列</div>
+                            </div>
+                            <div class="bg-purple-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">🥬</div>
+                                <div class="font-semibold">Celery</div>
+                                <div class="text-sm text-gray-600">异步任务</div>
+                            </div>
+                            <div class="bg-cyan-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">⚛️</div>
+                                <div class="font-semibold">React</div>
+                                <div class="text-sm text-gray-600">TypeScript</div>
+                            </div>
+                            <div class="bg-yellow-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">📊</div>
+                                <div class="font-semibold">Prometheus</div>
+                                <div class="text-sm text-gray-600">指标监控</div>
+                            </div>
+                            <div class="bg-orange-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">🔗</div>
+                                <div class="font-semibold">OpenTelemetry</div>
+                                <div class="text-sm text-gray-600">分布式追踪</div>
+                            </div>
+                            <div class="bg-pink-50 p-4 rounded-lg text-center">
+                                <div class="text-2xl mb-2">🐳</div>
+                                <div class="font-semibold">Docker</div>
+                                <div class="text-sm text-gray-600">Kubernetes</div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Mermaid
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis'
+            }
+        });
+
+        // Update last modified time
+        document.getElementById('lastUpdate').textContent = 
+            '最后更新: ' + new Date().toLocaleString('zh-CN');
+
+        // Smooth scroll for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Auto-refresh (optional - uncomment if using file watcher)
+        // setInterval(() => {
+        //     fetch(window.location.pathname + '?t=' + Date.now(), { method: 'HEAD' })
+        //         .then(response => {
+        //             if (response.headers.get('Last-Modified')) {
+        //                 const lastMod = new Date(response.headers.get('Last-Modified'));
+        //                 if (lastMod > document.lastModified) {
+        //                     window.location.reload();
+        //                 }
+        //             }
+        //         });
+        // }, 5000);
+    </script>
+</body>
+</html>
