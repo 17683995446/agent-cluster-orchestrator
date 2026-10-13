@@ -12,7 +12,7 @@ sys.path.insert(0, '/workspace/backend')
 from app.llm.siliconflow_provider import SiliconFlowProvider, SiliconFlowModel
 
 
-SILICONFLOW_API_KEY = "sk-uqelhavcdhfxjzjesdenxpbtqombamjniazzjtbssmdcwdvg"
+SILICONFLOW_API_KEY = "REDACTED_API_KEY"
 
 
 async def test_siliconflow():

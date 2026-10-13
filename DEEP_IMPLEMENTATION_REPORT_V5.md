@@ -487,7 +487,7 @@ from app.llm.siliconflow_provider import SiliconFlowProvider, SiliconFlowModel
 
 # 初始化提供商
 provider = SiliconFlowProvider(
-    api_key="sk-uqelhavcdhfxjzjesdenxpbtqombamjniazzjtbssmdcwdvg",
+    api_key="REDACTED_API_KEY",
     default_model=SiliconFlowModel.QWEN_7B.value
 )
 
